@@ -1,0 +1,24 @@
+name: Criar branches padrão em repo novo
+
+on:
+  repository_dispatch:
+    types: [repo-criado]
+
+jobs:
+  criar-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Criar dev e hml
+        env:
+          GH_TOKEN: ${{ secrets.ORG_TOKEN }}
+          REPO: ${{ github.event.client_payload.repo }}
+          ORG: ${{ github.event.client_payload.org }}
+        run: |
+          SHA=$(gh api repos/$ORG/$REPO/git/ref/heads/main --jq .object.sha)
+          
+          for branch in hml dev; do
+            gh api repos/$ORG/$REPO/git/refs \
+              -f ref="refs/heads/$branch" \
+              -f sha="$SHA" \
+              || echo "Branch $branch já existe ou falhou, seguindo..."
+          done
