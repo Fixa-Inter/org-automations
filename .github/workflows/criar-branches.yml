@@ -12,21 +12,21 @@ jobs:
 
     steps:
       - name: Configurar branches, proteção e workflow
-      uses: actions/github-script@v8
-      with:
-        github-token: ${{ secrets.ORG_AUTOMATION_TOKEN }}
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.ORG_AUTOMATION_TOKEN }}
 
-        script: |
-          const owner = context.payload.client_payload.org;
-          const repo = context.payload.client_payload.repo;
+          script: |
+            const owner = context.payload.client_payload.org;
+            const repo = context.payload.client_payload.repo;
 
-          if (!owner || !repo) {
-            throw new Error(
-              "Payload inválido: organização ou repositório não informado."
-            );
-          }
+            if (!owner || !repo) {
+              throw new Error(
+                "Payload inválido: organização ou repositório não informado."
+              );
+            }
 
-          console.log(`Configurando ${owner}/${repo}`);
+            console.log(`Configurando ${owner}/${repo}`);
 
           // =====================================================
           // 1. Verificar main
