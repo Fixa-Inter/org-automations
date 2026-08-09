@@ -102,45 +102,6 @@ jobs:
             }
 
             // =====================================================
-            // 3. Proteger branches
-            // =====================================================
-
-            async function protectBranch(branch) {
-
-              console.log(`Protegendo branch ${branch}...`);
-
-              await github.rest.repos.updateBranchProtection({
-                owner,
-                repo,
-                branch,
-
-                required_status_checks: null,
-
-                enforce_admins: true,
-
-                required_pull_request_reviews: {
-                  required_approving_review_count: 1,
-                  dismiss_stale_reviews: true,
-                  require_code_owner_reviews: false,
-                  require_last_push_approval: false
-                },
-
-                restrictions: null,
-
-                required_linear_history: false,
-                allow_force_pushes: false,
-                allow_deletions: false,
-                block_creations: false,
-                required_conversation_resolution: false
-              });
-
-              console.log(`Branch ${branch} protegida.`);
-            }
-
-            await protectBranch("main");
-            await protectBranch("hml");
-
-            // =====================================================
             // 4. Criar workflow de release
             // =====================================================
 
@@ -217,3 +178,42 @@ jobs:
             console.log(
               `Configuração concluída para ${owner}/${repo}.`
             );
+
+            // =====================================================
+            // 3. Proteger branches
+            // =====================================================
+
+            async function protectBranch(branch) {
+
+              console.log(`Protegendo branch ${branch}...`);
+
+              await github.rest.repos.updateBranchProtection({
+                owner,
+                repo,
+                branch,
+
+                required_status_checks: null,
+
+                enforce_admins: true,
+
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: true,
+                  require_code_owner_reviews: false,
+                  require_last_push_approval: false
+                },
+
+                restrictions: null,
+
+                required_linear_history: false,
+                allow_force_pushes: false,
+                allow_deletions: false,
+                block_creations: false,
+                required_conversation_resolution: false
+              });
+
+              console.log(`Branch ${branch} protegida.`);
+            }
+
+            await protectBranch("main");
+            await protectBranch("hml");
