@@ -102,6 +102,37 @@ jobs:
             }
 
             // =====================================================
+            // 2. Criar dev caso não exista
+            // =====================================================
+
+            try {
+              await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "dev"
+              });
+
+              console.log("Branch dev já existe.");
+
+            } catch (error) {
+
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              console.log("Criando branch dev...");
+
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: "refs/heads/dev",
+                sha: main.data.commit.sha
+              });
+
+              console.log("Branch dev criada.");
+            }
+
+            // =====================================================
             // 4. Criar workflow de release
             // =====================================================
 
