@@ -1,24 +1,157 @@
-name: Criar branches padrão em repo novo
+name: Configurar novo repositório
 
 on:
   repository_dispatch:
-    types: [repo-criado]
+    types:
+      - repo-criado
 
 jobs:
-  criar-branches:
+  setup:
+    name: Configurar repositório
     runs-on: ubuntu-latest
+
     steps:
-      - name: Criar dev e hml
-        env:
-          GH_TOKEN: ${{ secrets.ORG_TOKEN }}
-          REPO: ${{ github.event.client_payload.repo }}
-          ORG: ${{ github.event.client_payload.org }}
-        run: |
-          SHA=$(gh api repos/$ORG/$REPO/git/ref/heads/main --jq .object.sha)
-          
-          for branch in hml dev; do
-            gh api repos/$ORG/$REPO/git/refs \
-              -f ref="refs/heads/$branch" \
-              -f sha="$SHA" \
-              || echo "Branch $branch já existe ou falhou, seguindo..."
-          done
+      - name: Configurar branches, proteção e workflow
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.ORG_AUTOMATION_TOKEN }}
+
+          script: |
+
+            const owner = context.payload.client_payload.org;
+            const repo = context.payload.client_payload.repo;
+
+            console.log(`Configurando ${owner}/${repo}`);
+
+
+            // =====================================================
+            // 1. Verificar main
+            // =====================================================
+
+            let main;
+
+            try {
+              main = await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "main"
+              });
+            } catch (error) {
+              throw new Error(
+                `A branch main não existe em ${owner}/${repo}`
+              );
+            }
+
+
+            // =====================================================
+            // 2. Criar hml
+            // =====================================================
+
+            try {
+
+              await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "hml"
+              });
+
+              console.log("Branch hml já existe.");
+
+            } catch (error) {
+
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              console.log("Criando branch hml...");
+
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: "refs/heads/hml",
+                sha: main.data.commit.sha
+              });
+            }
+
+
+            // =====================================================
+            // 3. Proteger branches
+            // =====================================================
+
+            async function protectBranch(branch) {
+
+              console.log(`Protegendo branch ${branch}...`);
+
+              await github.rest.repos.updateBranchProtection({
+
+                owner,
+                repo,
+                branch,
+
+                required_status_checks: null,
+
+                enforce_admins: true,
+
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: true,
+                  require_code_owner_reviews: false,
+                  require_last_push_approval: false
+                },
+
+                restrictions: null,
+
+                required_linear_history: false,
+
+                allow_force_pushes: false,
+
+                allow_deletions: false,
+
+                block_creations: false,
+
+                required_conversation_resolution: false
+              });
+            }
+
+            await protectBranch("main");
+            await protectBranch("hml");
+
+
+            // =====================================================
+            // 4. Criar workflow de release
+            // =====================================================
+
+            const releaseWorkflow = `name: Criar Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: ${owner}/.github/.github/workflows/auto-release.yml@main
+    permissions:
+      contents: write
+`;
+
+            console.log("Criando release.yml...");
+
+            await github.rest.repos.createOrUpdateFileContents({
+
+              owner,
+              repo,
+
+              path: ".github/workflows/release.yml",
+
+              message: "chore: adiciona workflow de release",
+
+              content: Buffer
+                .from(releaseWorkflow)
+                .toString("base64")
+            });
+
+
+            console.log(
+              `Configuração concluída para ${owner}/${repo}`
+            );
