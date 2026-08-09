@@ -11,10 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Gerar token do GitHub App
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Configurar branches, proteção e workflow
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.ORG_AUTOMATION_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token }}
 
           script: |
             const owner = context.payload.client_payload.org;
