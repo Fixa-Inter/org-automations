@@ -28,171 +28,171 @@ jobs:
 
             console.log(`Configurando ${owner}/${repo}`);
 
-          // =====================================================
-          // 1. Verificar main
-          // =====================================================
+            // =====================================================
+            // 1. Verificar main
+            // =====================================================
 
-          let main;
+            let main;
 
-          try {
-            main = await github.rest.repos.getBranch({
+            try {
+              main = await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "main"
+              });
+
+              console.log("Branch main encontrada.");
+
+            } catch (error) {
+              throw new Error(
+                `A branch main não existe em ${owner}/${repo}.`
+              );
+            }
+
+            // =====================================================
+            // 2. Criar hml caso não exista
+            // =====================================================
+
+            try {
+              await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "hml"
+              });
+
+              console.log("Branch hml já existe.");
+
+            } catch (error) {
+
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              console.log("Criando branch hml...");
+
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: "refs/heads/hml",
+                sha: main.data.commit.sha
+              });
+
+              console.log("Branch hml criada.");
+            }
+
+            // =====================================================
+            // 3. Proteger branches
+            // =====================================================
+
+            async function protectBranch(branch) {
+
+              console.log(`Protegendo branch ${branch}...`);
+
+              await github.rest.repos.updateBranchProtection({
+                owner,
+                repo,
+                branch,
+
+                required_status_checks: null,
+
+                enforce_admins: true,
+
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: true,
+                  require_code_owner_reviews: false,
+                  require_last_push_approval: false
+                },
+
+                restrictions: null,
+
+                required_linear_history: false,
+                allow_force_pushes: false,
+                allow_deletions: false,
+                block_creations: false,
+                required_conversation_resolution: false
+              });
+
+              console.log(`Branch ${branch} protegida.`);
+            }
+
+            await protectBranch("main");
+            await protectBranch("hml");
+
+            // =====================================================
+            // 4. Criar workflow de release
+            // =====================================================
+
+            const releaseWorkflow = [
+              "name: Criar Release",
+              "",
+              "on:",
+              "  push:",
+              "    branches:",
+              "      - main",
+              "",
+              "jobs:",
+              "  release:",
+              `    uses: ${owner}/.github/.github/workflows/auto-release.yml@main`,
+              "    permissions:",
+              "      contents: write",
+              ""
+            ].join("\n");
+
+            // =====================================================
+            // 5. Verificar se release.yml já existe
+            // =====================================================
+
+            let existingFile = null;
+
+            try {
+              existingFile = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: ".github/workflows/release.yml"
+              });
+
+              console.log("release.yml já existe.");
+
+            } catch (error) {
+
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              console.log("release.yml ainda não existe.");
+            }
+
+            // =====================================================
+            // 6. Criar ou atualizar release.yml
+            // =====================================================
+
+            const fileParams = {
               owner,
               repo,
-              branch: "main"
-            });
+              path: ".github/workflows/release.yml",
 
-            console.log("Branch main encontrada.");
+              message: existingFile
+                ? "chore: atualiza workflow de release"
+                : "chore: adiciona workflow de release",
 
-          } catch (error) {
-            throw new Error(
-              `A branch main não existe em ${owner}/${repo}.`
+              content: Buffer
+                .from(releaseWorkflow)
+                .toString("base64")
+            };
+
+            if (existingFile) {
+              fileParams.sha = existingFile.data.sha;
+            }
+
+            await github.rest.repos.createOrUpdateFileContents(
+              fileParams
             );
-          }
 
-          // =====================================================
-          // 2. Criar hml caso não exista
-          // =====================================================
+            console.log(
+              `Workflow release.yml configurado em ${owner}/${repo}.`
+            );
 
-          try {
-            await github.rest.repos.getBranch({
-              owner,
-              repo,
-              branch: "hml"
-            });
-
-            console.log("Branch hml já existe.");
-
-          } catch (error) {
-
-            if (error.status !== 404) {
-              throw error;
-            }
-
-            console.log("Criando branch hml...");
-
-            await github.rest.git.createRef({
-              owner,
-              repo,
-              ref: "refs/heads/hml",
-              sha: main.data.commit.sha
-            });
-
-            console.log("Branch hml criada.");
-          }
-
-          // =====================================================
-          // 3. Proteger branches
-          // =====================================================
-
-          async function protectBranch(branch) {
-
-            console.log(`Protegendo branch ${branch}...`);
-
-            await github.rest.repos.updateBranchProtection({
-              owner,
-              repo,
-              branch,
-
-              required_status_checks: null,
-
-              enforce_admins: true,
-
-              required_pull_request_reviews: {
-                required_approving_review_count: 1,
-                dismiss_stale_reviews: true,
-                require_code_owner_reviews: false,
-                require_last_push_approval: false
-              },
-
-              restrictions: null,
-
-              required_linear_history: false,
-              allow_force_pushes: false,
-              allow_deletions: false,
-              block_creations: false,
-              required_conversation_resolution: false
-            });
-
-            console.log(`Branch ${branch} protegida.`);
-          }
-
-          await protectBranch("main");
-          await protectBranch("hml");
-
-          // =====================================================
-          // 4. Criar workflow de release
-          // =====================================================
-
-          const releaseWorkflow = [
-            "name: Criar Release",
-            "",
-            "on:",
-            "  push:",
-            "    branches:",
-            "      - main",
-            "",
-            "jobs:",
-            "  release:",
-            `    uses: ${owner}/.github/.github/workflows/auto-release.yml@main`,
-            "    permissions:",
-            "      contents: write",
-            ""
-          ].join("\n");
-
-          // =====================================================
-          // 5. Verificar se release.yml já existe
-          // =====================================================
-
-          let existingFile = null;
-
-          try {
-            existingFile = await github.rest.repos.getContent({
-              owner,
-              repo,
-              path: ".github/workflows/release.yml"
-            });
-
-            console.log("release.yml já existe.");
-
-          } catch (error) {
-
-            if (error.status !== 404) {
-              throw error;
-            }
-
-            console.log("release.yml ainda não existe.");
-          }
-
-          // =====================================================
-          // 6. Criar ou atualizar release.yml
-          // =====================================================
-
-          const fileParams = {
-            owner,
-            repo,
-            path: ".github/workflows/release.yml",
-
-            message: existingFile
-              ? "chore: atualiza workflow de release"
-              : "chore: adiciona workflow de release",
-
-            content: Buffer
-              .from(releaseWorkflow)
-              .toString("base64")
-          };
-
-          if (existingFile) {
-            fileParams.sha = existingFile.data.sha;
-          }
-
-          await github.rest.repos.createOrUpdateFileContents(
-            fileParams
-          );
-
-          console.log(
-            `Workflow release.yml configurado em ${owner}/${repo}.`
-          );
-
-          console.log(
-            `Configuração concluída para ${owner}/${repo}.`
-          );
+            console.log(
+              `Configuração concluída para ${owner}/${repo}.`
+            );
