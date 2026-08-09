@@ -51,7 +51,7 @@ jobs:
               console.log(`Repositório encontrado: ${repository.data.full_name}`);
               console.log(`Branch padrão: ${repository.data.default_branch}`);
 
-              const main = await github.rest.repos.getBranch({
+              main = await github.rest.repos.getBranch({
                 owner,
                 repo,
                 branch: "main"
